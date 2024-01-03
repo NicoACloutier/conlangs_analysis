@@ -1,22 +1,16 @@
-import praw, time, typing
+import praw, time
 
 TIME_TO_WAIT = 2 #time to wait between requests to server, so as not to increase load too much
-
-def make_instance(client_id: str, client_secret: str, username: str) -> praw.Reddit:
-    '''
-    Make a Reddit instance for data retrieval.
-    Arguments:
-        `client_id: str`: the client ID for this instance.
-        `client_secret: str`: the secret key for this instance.
-        `username: str`: the name of the user agent for retrieval.
-    Returns:
-        `praw.Reddit`: a `praw` read-only Reddit instance.
-    '''
-    return praw.Reddit(client_id, client_secret, username)
 
 def get_elapsed(current: float, previous: float) -> str:
     '''
     Return the elapsed time as a pretty string for reporting.
+    Arguments:
+        `current: float`: the current (later) time in seconds.
+        `previous: float`: the previous (earlier) time in seconds.
+    Returns:
+        `str`: a string for the format f'{hours} hours, {minutes} minutes, and {seconds} seconds', 
+            with hours and minutes being integers, and seconds rounded to three decimal points.
     '''
     hours = int(current-previous) // 3600
     min_begin = previous + hours * 3600
@@ -25,7 +19,7 @@ def get_elapsed(current: float, previous: float) -> str:
     seconds = current - sec_begin
     return f'{hours} hours, {minutes} minutes, and {seconds:.3f} seconds'
 
-def retrieve(reddit: praw.Reddit, subreddit: str, begin_time: float, end_time: float) -> list[praw.Submission]:
+def retrieve(reddit: praw.Reddit, subreddit: str, begin_time: float, end_time: float, wait_time: float=TIME_TO_WAIT) -> list[praw.Submission]:
     '''
     Retrieve all posts on a subreddit in a time frame.
     Arguments:
@@ -41,13 +35,12 @@ def retrieve(reddit: praw.Reddit, subreddit: str, begin_time: float, end_time: f
         iter_start = time.time()
         
         #actually perform query, add to results
-        query = f'timestamp:{current}..{end_time}'
-        temp_results = reddit.subreddit(subreddit).search(query, sort='new')
-        temp_results = list(temp_results)
+        temp_results = reddit.subreddit(subreddit).search(f'timestamp:{current}..{end_time}', sort='new')
+        temp_results = list(temp_results) #this is the part that actually requests the submissions from Reddit servers
         posts += temp_results
         
         #deal with time stuff
-        previous, current = current, temp_results[-1].created_utc
+        previous, current = current, temp_results[-1].created_utc+1
         elapsed = get_elapsed(current, previous)
         remaining = get_elapsed(end_time, current)
         
@@ -60,6 +53,9 @@ def retrieve(reddit: praw.Reddit, subreddit: str, begin_time: float, end_time: f
         remaining_elapsed = get_elapsed(remaining_time, 0)
         print(f'Retrieved {i:,},000th post, spanning {elapsed} of real time. Finished iteration in {iter_time:.2f}.')
         print(f'\t{remaining} of real time remain. At this rate, expecting to finish {remaining_iter:.0f} iterations in {remaining_elapsed}.')
-        print(f'\tWaiting {TIME_TO_WAIT} seconds before next iteration.')
-        time.sleep(TIME_TO_WAIT) #don't want to work those servers too hard
+        print(f'\tWaiting {wait_time} seconds before next iteration.')
+        
+        #cleanup
+        i += 1
+        time.sleep(wait_time) #don't want to work those servers too hard
     return [post for post in posts if post.created_utc < end_time][::-1]
