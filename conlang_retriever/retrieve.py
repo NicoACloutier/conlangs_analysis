@@ -1,4 +1,4 @@
-import praw, time
+import praw, time, datetime
 
 TIME_TO_WAIT = 2 #time to wait between requests to server, so as not to increase load too much
 
@@ -19,7 +19,7 @@ def get_elapsed(current: float, previous: float) -> str:
     seconds = current - sec_begin
     return f'{hours} hours, {minutes} minutes, and {seconds:.3f} seconds'
 
-def retrieve(reddit: praw.Reddit, subreddit: str, begin_time: float, end_time: float, wait_time: float=TIME_TO_WAIT) -> list[praw.Submission]:
+def retrieve(reddit: praw.Reddit, subreddit: str, begin_time: float, end_time: float, wait_time: float=TIME_TO_WAIT) -> list[praw.models.Submission]:
     '''
     Retrieve all posts on a subreddit in a time frame.
     Arguments:
@@ -31,11 +31,12 @@ def retrieve(reddit: praw.Reddit, subreddit: str, begin_time: float, end_time: f
         `list[praw.Submission]`: a list of all submissions made during the time period, sorted first posted to last posted.
     '''
     current, posts, i = begin_time, [], 0
-    while current < end_time:
+    while int(current) < int(end_time):
+        current_post = None
         iter_start = time.time()
         
         #actually perform query, add to results
-        temp_results = reddit.subreddit(subreddit).search(f'timestamp:{current}..{end_time}', sort='new')
+        temp_results = reddit.subreddit(subreddit).new(params={"after": current_post.fullname} if current_post else dict())
         temp_results = list(temp_results) #this is the part that actually requests the submissions from Reddit servers
         posts += temp_results
         
@@ -51,11 +52,14 @@ def retrieve(reddit: praw.Reddit, subreddit: str, begin_time: float, end_time: f
         remaining_time = (end_time - current) * time_rate
         remaining_iter = remaining_time / iter_time
         remaining_elapsed = get_elapsed(remaining_time, 0)
-        print(f'Retrieved {i:,},000th post, spanning {elapsed} of real time. Finished iteration in {iter_time:.2f}.')
-        print(f'\t{remaining} of real time remain. At this rate, expecting to finish {remaining_iter:.0f} iterations in {remaining_elapsed}.')
+        print(f'Retrieved {i:,},000th post, spanning {elapsed} of real time.
+        print(f'\tFinished iteration in {iter_time:.2f}.')
+        print(f'\t{remaining} of real time remain.')
+        print(f'\tAt this rate, expecting to finish {remaining_iter:.0f} iterations in {remaining_elapsed}.')
         print(f'\tWaiting {wait_time} seconds before next iteration.')
         
         #cleanup
         i += 1
+        current_post = posts[-1]
         time.sleep(wait_time) #don't want to work those servers too hard
     return [post for post in posts if post.created_utc < end_time][::-1]
