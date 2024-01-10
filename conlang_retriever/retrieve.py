@@ -1,4 +1,4 @@
-import praw, time, datetime
+import praw, time, datetime, psaw
 
 TIME_TO_WAIT = 2 #time to wait between requests to server, so as not to increase load too much
 
@@ -32,6 +32,7 @@ def retrieve(reddit: praw.Reddit, subreddit: str, latest_post: float, elapsed_ti
     Returns:
         `list[praw.Submission]`: a list of all submissions made during the time period, sorted first posted to last posted.
     '''
+    ps = psaw.PushshiftAPI(reddit)
     begin_time, end_time = latest_post, latest_post - elapsed_time
     current, posts, i = begin_time, [], 1
     while int(current) > int(end_time):
@@ -39,8 +40,8 @@ def retrieve(reddit: praw.Reddit, subreddit: str, latest_post: float, elapsed_ti
         iter_start = time.time()
         
         #actually perform query, add to results
-        temp_results = reddit.subreddit(subreddit).new(params={"after": current_post.fullname} if current_post else dict())
-        temp_results = list(temp_results) #this is the part that actually requests the submissions from Reddit servers
+        temp_results = ps.search_submission(before=current, subreddit=subreddit, limit=None)
+        temp_results = list(temp_results) #this is the part that actually requests the submissions from servers
         posts += temp_results
         
         #deal with time stuff
