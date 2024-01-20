@@ -15,7 +15,7 @@ def make_df(url: str=URL) -> pd.DataFrame:
     response = requests.get(url)
     soup = bs4.BeautifulSoup(response.content, 'html.parser')
     table = soup.find('table')
-    df = pd.read_html(io.StringIO(u'%s' %str(table)))[0].drop('Unnamed: 0', axis=1)
+    df = pd.read_html(io.StringIO(u'%s' %str(table)))[0]
     return df.drop('Unnamed: 0', axis=1) if 'Unnamed: 0' in df.columns else df
 
 def convert_row(row: tuple[int, pd.Series]) -> str:
