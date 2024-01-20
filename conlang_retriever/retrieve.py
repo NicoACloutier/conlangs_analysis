@@ -15,7 +15,7 @@ def make_df(url: str=URL) -> pd.DataFrame:
     response = requests.get(url)
     soup = bs4.BeautifulSoup(response.content, 'html.parser')
     table = soup.find('table')
-    df = pd.read_html(str(table))[0].drop('Unnamed: 0', axis=1)
+    df = pd.read_html(io.StringIO(u'%s' %str(table)))[0].drop('Unnamed: 0', axis=1)
     return df.drop('Unnamed: 0', axis=1) if 'Unnamed: 0' in df.columns else df
 
 def convert_row(row: tuple[int, pd.Series]) -> str:
@@ -26,7 +26,7 @@ def convert_row(row: tuple[int, pd.Series]) -> str:
     Returns:
         `str`: the row to be inserted.
     '''
-    return str(tuple(row[1].values))
+    return str(tuple(row[1].fillna('').values)).replace("\\'", ' ')
 
 def convert_db(df: pd.DataFrame) -> None:
     '''
@@ -36,7 +36,10 @@ def convert_db(df: pd.DataFrame) -> None:
     Returns:
         `None`
     '''
-    connection = sqlite3.connect('../data/conlangs.db')
+    connection = sqlite3.connect('data/conlangs.db')
     cursor = connection.cursor()
-    cursor.execute(f'CREATE TABLE conlangs({", ".join(df.columns.values)})')
-    cursor.execute(f'INSERT INTO conlangs VALUES {", ".join(convert_row(row) for row in df.iterrows())}')
+    names = ", ".join(name.lower().replace(' ', '_') for name in df.columns.values)
+    cursor.execute(f'CREATE TABLE conlangs({names})')
+    values = ", ".join(convert_row(row) for row in df.iterrows())
+    cursor.execute(f'INSERT INTO conlangs VALUES {values}')
+    connection.commit()
