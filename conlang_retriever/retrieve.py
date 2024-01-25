@@ -38,8 +38,12 @@ def convert_db(df: pd.DataFrame) -> None:
     '''
     connection = sqlite3.connect('data/conlangs.db')
     cursor = connection.cursor()
-    names = ", ".join(name.lower().replace(' ', '_') for name in df.columns.values)
-    cursor.execute(f'CREATE TABLE conlangs({names})')
-    values = ", ".join(convert_row(row) for row in df.iterrows())
-    cursor.execute(f'INSERT INTO conlangs VALUES {values}')
-    connection.commit()
+    exists = cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='conlangs';").fetchall()
+    if exists:
+        return
+    else:
+        names = ", ".join(name.lower().replace(' ', '_') for name in df.columns.values)
+        cursor.execute(f'CREATE TABLE conlangs({names})')
+        values = ", ".join(convert_row(row) for row in df.iterrows())
+        cursor.execute(f'INSERT INTO conlangs VALUES {values}')
+        connection.commit()
