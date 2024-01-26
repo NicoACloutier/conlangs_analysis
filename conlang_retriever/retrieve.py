@@ -2,6 +2,7 @@ import requests, bs4, io, sqlite3
 import pandas as pd
 
 URL = 'https://database.conlang.org/search/'
+DB_LOCATION = 'data/conlangs.db'
 
 def make_df(url: str=URL) -> pd.DataFrame:
     '''
@@ -36,7 +37,7 @@ def convert_db(df: pd.DataFrame) -> None:
     Returns:
         `None`
     '''
-    connection = sqlite3.connect('data/conlangs.db')
+    connection = sqlite3.connect(DB_LOCATION)
     cursor = connection.cursor()
     exists = cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='conlangs';").fetchall()
     if exists:
