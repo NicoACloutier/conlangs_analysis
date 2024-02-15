@@ -1,9 +1,12 @@
 from conlang_retriever import retrieve
 import plotly.express as px
+import dash_bootstrap_components as dbc
+import dash_bootstrap_templates as dbt
 import dash, plotly, sqlite3, pyspark, findspark, pandas as pd
 
 MINIMUM_YEAR = 1000 # the minimum year for included conlangs in the time histogram
 YEAR_COLUMN = 'start_year' # the column of the database with year information
+HIST_BINS = 20 # number of bins for the histogram
 
 def read_database(spark: pyspark.sql.SparkSession) -> pyspark.sql.DataFrame:
     '''
@@ -33,30 +36,38 @@ def make_time_histogram(df: pyspark.sql.DataFrame, column: str=YEAR_COLUMN, mini
     df = df.filter(df[column] != '')
     int_udf = pyspark.sql.functions.udf(lambda x: int(x), pyspark.sql.types.IntegerType())   
     df.withColumn(column, int_udf(pyspark.sql.functions.col(column)))
+    df = df.filter(2500 > df[column])
     df = df.filter(df[column] > minimum_year)
-    return px.histogram(df, x=column)
+    years = df.select(column).collect()
+    years = sorted([int(float(row.start_year)) for row in years])
+    return px.histogram(years, nbins=HIST_BINS, template="darkly")
 
 def main():
     findspark.init()
     retrieve.convert_db(retrieve.make_df(retrieve.URL)) # retrieve data and make database if necessary
     spark = pyspark.sql.SparkSession.builder.getOrCreate()
     data = read_database(spark)
+
+    dbt.load_figure_template('darkly')
     
     # create visualizations
     time_histogram = make_time_histogram(data)
+    style = {'color': '#fa677f',
+             'text-indent': '30px',
+             'font': '100% system-ui'}
     
-    app = dash.Dash(__name__)
-    app.layout = dash.html.Div(children=[
-        dash.html.H1(children='Conlangs database analysis'),
+    app = dash.Dash(__name__, external_stylesheets=[dbc.themes.DARKLY])
+    app.layout = dash.html.Div(style=style, children=[
+        dbc.Row(dbc.Col(dash.html.H1(children='Conlangs database analysis'))),
 
-        dash.html.Div(children='''
+        dbc.Row(dbc.Col(dash.html.Div(children='''
             An analysis of the online and freely available conlangs database.
-        '''),
+        '''))),
 
-        dash.dcc.Graph(
+        dbc.Row(dbc.Col(dash.dcc.Graph(
             id='time_histogram',
             figure=time_histogram
-        )
+        )))
     ])
     app.run(debug=True)
 
